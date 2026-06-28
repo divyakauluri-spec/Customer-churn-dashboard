@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Customer Churn Analysis — Telco Dataset</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F4F6FB;
+    --panel:#FFFFFF;
+    --panel-2:#FBFCFE;
+    --line:rgba(20,30,50,0.08);
+    --line-strong:rgba(20,30,50,0.16);
+    --text:#15213B;
+    --text-dim:#5B6B8C;
+    --text-faint:#8C99B5;
+    --churn:#FF3B5C;
+    --churn-dim:rgba(255,59,92,0.12);
+    --retain:#00C292;
+    --retain-dim:rgba(0,194,146,0.12);
+    --amber:#FFB300;
+    --blue:#2D6CFF;
+    --radius:14px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto;}
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+
+  h1,h2,h3,.num{font-family:'Space Grotesk',sans-serif;}
+
+  /* ---------- background texture ---------- */
+  .grid-bg{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      linear-gradient(rgba(20,30,50,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(20,30,50,0.035) 1px, transparent 1px);
+    background-size:48px 48px;
+    mask-image:radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 75%);
+  }
+
+  /* ---------- header ---------- */
+  header{
+    position:relative; z-index:2;
+    padding:28px 5vw 0;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--churn); box-shadow:0 0 0 3px var(--churn-dim);}
+  .brand-text{font-size:13px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+  .source-tag{
+    font-size:12px; color:var(--text-faint); border:1px solid var(--line-strong);
+    padding:6px 12px; border-radius:100px; letter-spacing:0.02em;
+    background:#fff;
+  }
+
+  /* ---------- hero ---------- */
+  .hero{
+    position:relative; z-index:2;
+    padding:48px 5vw 36px;
+    display:grid; grid-template-columns:1.15fr 0.85fr; gap:40px; align-items:center;
+  }
+  .hero-eyebrow{
+    font-size:13px; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--churn); font-weight:700; margin-bottom:14px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .hero-eyebrow::before{content:''; width:24px; height:2px; background:var(--churn);}
+  .hero h1{
+    font-size:clamp(34px,4.4vw,58px); line-height:1.05; font-weight:700; margin:0 0 18px;
+    letter-spacing:-0.01em;
+  }
+  .hero h1 em{font-style:normal; color:var(--blue);}
+  .hero p.lead{
+    font-size:16.5px; line-height:1.65; color:var(--text-dim); max-width:540px; margin:0;
+  }
+
+  /* gauge */
+  .gauge-wrap{display:flex; flex-direction:column; align-items:center; justify-content:center;}
+  .gauge-card{
+    background:linear-gradient(160deg, var(--panel), var(--panel-2));
+    border:1px solid var(--line-strong); border-radius:20px;
+    padding:28px 28px 22px; width:100%; max-width:340px;
+    box-shadow:0 24px 50px -20px rgba(45,108,255,0.18);
+  }
+  .gauge-label{font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-faint); text-align:center; margin-bottom:6px; font-weight:600;}
+  svg.gauge{display:block; margin:0 auto;}
+  .gauge-num{
+    font-size:46px; font-weight:700; text-align:center; margin-top:-8px;
+    transition:color 0.4s;
+  }
+  .gauge-sub{text-align:center; font-size:12.5px; color:var(--text-faint); margin-top:2px;}
+  .gauge-legend{display:flex; justify-content:center; gap:18px; margin-top:14px;}
+  .gauge-legend span{font-size:11.5px; color:var(--text-dim); display:flex; align-items:center; gap:6px;}
+  .gauge-legend .sw{width:9px;height:9px;border-radius:3px;display:inline-block;}
+
+  /* ---------- KPI STRIP (sticky) ---------- */
+  .kpi-rail{
+    position:sticky; top:0; z-index:10;
+    background:rgba(244,246,251,0.92);
+    backdrop-filter:blur(14px);
+    border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+    padding:14px 5vw;
+  }
+  .kpi-grid{
+    display:grid; grid-template-columns:repeat(5,1fr); gap:0;
+    max-width:1280px; margin:0 auto;
+  }
+  .kpi{
+    padding:6px 18px; border-left:1px solid var(--line); position:relative;
+  }
+  .kpi:first-child{border-left:none; padding-left:0;}
+  .kpi-label{font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-faint); font-weight:600; margin-bottom:4px;}
+  .kpi-val{font-size:24px; font-weight:700; line-height:1; font-family:'Space Grotesk',sans-serif; color:var(--blue);}
+  .kpi-val.is-churn{color:var(--churn);}
+  .kpi-delta{font-size:11px; color:var(--text-dim); margin-top:3px;}
+
+  /* ---------- main layout ---------- */
+  .layout{
+    position:relative; z-index:2;
+    max-width:1280px; margin:0 auto;
+    padding:0 5vw 80px;
+    display:grid; grid-template-columns:1fr 260px; gap:32px;
+  }
+  main{min-width:0;}
+
+  section.block{padding:52px 0 18px; border-top:1px solid var(--line);}
+  section.block:first-of-type{border-top:none; padding-top:36px;}
+  .block-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:22px; flex-wrap:wrap;}
+  .block-head h2{font-size:23px; font-weight:700; margin:0; letter-spacing:-0.01em;}
+  .block-head .block-note{font-size:13px; color:var(--text-faint); max-width:380px; text-align:right;}
+
+  .chart-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
+  .chart-grid.two{grid-template-columns:repeat(2,1fr);}
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px 20px 16px; min-width:0;
+    box-shadow:0 6px 20px -10px rgba(20,30,50,0.08);
+  }
+  .panel h3{font-size:13.5px; font-weight:700; margin:0 0 14px; color:var(--text);}
+  .panel h3 .hint{font-size:11px; color:var(--text-faint); font-weight:400; display:block; margin-top:2px;}
+  .panel svg{width:100%; height:auto; display:block; overflow:visible;}
+
+  .empty-note{
+    font-size:12.5px; color:var(--text-faint); text-align:center; padding:30px 10px;
+  }
+
+  /* legend rows */
+  .legend-row{display:flex; gap:16px; margin-top:10px; flex-wrap:wrap;}
+  .legend-row span{font-size:11.5px; color:var(--text-dim); display:flex; align-items:center; gap:6px;}
+  .legend-row .sw{width:9px;height:9px;border-radius:3px;}
+
+  /* insights */
+  .insights{
+    margin-top:18px;
+    background:linear-gradient(160deg, #FFF7E8, #FFFFFF);
+    border:1px solid #FFE2A8; border-radius:var(--radius);
+    padding:22px 24px;
+  }
+  .insights h3{margin:0 0 14px; font-size:14px; letter-spacing:0.06em; text-transform:uppercase; color:#B8780A; font-weight:700;}
+  .insights ul{margin:0; padding:0; list-style:none; display:grid; gap:10px;}
+  .insights li{font-size:14px; line-height:1.55; color:var(--text); padding-left:18px; position:relative;}
+  .insights li::before{content:'→'; position:absolute; left:0; color:var(--churn); font-weight:700;}
+
+  /* ---------- filter rail ---------- */
+  aside.filters{
+    position:sticky; top:96px; align-self:start;
+    max-height:calc(100vh - 120px); overflow-y:auto;
+    display:flex; flex-direction:column; gap:16px;
+    padding-bottom:20px;
+  }
+  .filter-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:2px;}
+  .filter-head span{font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-faint); font-weight:600;}
+  .reset-btn{
+    background:none; border:1px solid var(--line-strong); color:var(--text-dim);
+    font-size:11px; padding:4px 10px; border-radius:100px; cursor:pointer;
+    transition:all .15s; font-family:'Inter',sans-serif;
+  }
+  .reset-btn:hover{border-color:var(--churn); color:var(--churn);}
+  .filter-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 14px 12px;
+    box-shadow:0 4px 14px -8px rgba(20,30,50,0.08);
+  }
+  .filter-card h4{margin:0 0 10px; font-size:12px; font-weight:700; color:var(--text-dim); letter-spacing:0.03em;}
+  .opt-list{display:flex; flex-direction:column; gap:6px;}
+  .opt{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:7px 9px; border-radius:8px; cursor:pointer; font-size:13px;
+    border:1px solid transparent; transition:all .12s; user-select:none;
+  }
+  .opt:hover{background:rgba(45,108,255,0.06);}
+  .opt.active{background:var(--churn-dim); border-color:rgba(255,59,92,0.35); color:var(--text);}
+  .opt .cnt{font-size:11px; color:var(--text-faint); font-family:'Space Grotesk',sans-serif;}
+  .opt.active .cnt{color:var(--churn);}
+  .opt-check{
+    width:14px; height:14px; border-radius:4px; border:1.5px solid var(--text-faint); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; transition:all .12s;
+  }
+  .opt.active .opt-check{background:var(--churn); border-color:var(--churn);}
+  .opt-check svg{width:9px; height:9px; opacity:0; transition:opacity .12s;}
+  .opt.active .opt-check svg{opacity:1;}
+
+  .active-filters-note{
+    font-size:12px; color:var(--text-faint); line-height:1.5; padding:0 2px;
+  }
+  .active-filters-note b{color:var(--text);}
+
+  footer{
+    position:relative; z-index:2; text-align:center; padding:30px 5vw 50px;
+    color:var(--text-faint); font-size:12px; border-top:1px solid var(--line);
+  }
+
+  /* tooltip */
+  .viz-tooltip{
+    position:fixed; pointer-events:none; z-index:50;
+    background:#15213B; border:1px solid rgba(255,255,255,0.12); border-radius:8px;
+    padding:8px 11px; font-size:12px; color:#fff; line-height:1.5;
+    box-shadow:0 10px 30px -6px rgba(20,30,50,0.3); opacity:0; transition:opacity .1s;
+    max-width:200px;
+  }
+  .viz-tooltip b{color:#FFD166;}
+
+  /* responsive */
+  @media (max-width:980px){
+    .hero{grid-template-columns:1fr; gap:28px;}
+    .kpi-grid{grid-template-columns:repeat(2,1fr); gap:14px 0;}
+    .kpi{border-left:none !important; padding-left:0;}
+    .layout{grid-template-columns:1fr;}
+    aside.filters{position:static; max-height:none; flex-direction:row; flex-wrap:wrap;}
+    .filter-card{flex:1 1 220px;}
+    .chart-grid, .chart-grid.two{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<header>
+  <div class="brand">
+    <span class="dot"></span>
+    <span class="brand-text">Telco / Customer Risk Console</span>
+  </div>
+  <span class="source-tag">Dataset · 7,043 customers · IBM Telco Churn</span>
+</header>
+
+<section class="hero">
+  <div>
+    <div class="hero-eyebrow">Customer Churn Analysis</div>
+    <h1>Where retention <em>breaks</em>, and why.</h1>
+    <p class="lead">An interactive read of the telecom churn dataset — who's leaving, what they have in common, and which levers (contract, payment, service) move the number most. Use the filters on the right to isolate any segment; every chart and the gauge respond live.</p>
+  </div>
+  <div class="gauge-wrap">
+    <div class="gauge-card">
+      <div class="gauge-label">Churn Rate — Filtered Segment</div>
+      <svg class="gauge" id="gaugeSvg" viewBox="0 0 220 140"></svg>
+      <div class="gauge-num" id="gaugeNum">25.3%</div>
+      <div class="gauge-sub" id="gaugeSub">1,869 of 7,043 customers</div>
+      <div class="gauge-legend">
+        <span><i class="sw" style="background:var(--retain)"></i>Retained</span>
+        <span><i class="sw" style="background:var(--churn)"></i>Churned</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="kpi-rail">
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Total Customers</div>
+      <div class="kpi-val" id="kpiTotal">7,043</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Churned Customers</div>
+      <div class="kpi-val is-churn" id="kpiChurned">1,869</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Churn Rate</div>
+      <div class="kpi-val is-churn" id="kpiRate">26.5%</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Avg. Tenure</div>
+      <div class="kpi-val" id="kpiTenure">32.4 mo</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Avg. Monthly Charges</div>
+      <div class="kpi-val" id="kpiCharges">$64.76</div>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <main>
+
+    <section class="block" id="demographics">
+      <div class="block-head">
+        <h2>01 · Overview &amp; Customer Demographics</h2>
+        <div class="block-note">Who the customer base is made of — gender, partner status, and dependents.</div>
+      </div>
+      <div class="chart-grid">
+        <div class="panel">
+          <h3>Customers by Gender<span class="hint">Share of selected segment</span></h3>
+          <svg id="chartGender" viewBox="0 0 260 220"></svg>
+          <div class="legend-row" id="legendGender"></div>
+        </div>
+        <div class="panel">
+          <h3>Customers by Partner Status<span class="hint">Has partner vs. does not</span></h3>
+          <svg id="chartPartner" viewBox="0 0 260 220"></svg>
+        </div>
+        <div class="panel">
+          <h3>Customers by Dependents<span class="hint">Share of selected segment</span></h3>
+          <svg id="chartDependents" viewBox="0 0 260 220"></svg>
+          <div class="legend-row" id="legendDependents"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="drivers">
+      <div class="block-head">
+        <h2>02 · Churn Analysis &amp; Drivers</h2>
+        <div class="block-note">Where churn concentrates — tenure, contract terms, payment method, internet service.</div>
+      </div>
+      <div class="chart-grid two">
+        <div class="panel">
+          <h3>Customer Tenure Distribution<span class="hint">Months with the company, binned</span></h3>
+          <svg id="chartTenure" viewBox="0 0 460 230"></svg>
+        </div>
+        <div class="panel">
+          <h3>Churn by Contract Type<span class="hint">Month-to-month vs. one/two year</span></h3>
+          <svg id="chartContract" viewBox="0 0 460 230"></svg>
+        </div>
+        <div class="panel">
+          <h3>Churn by Payment Method<span class="hint">Electronic check stands out</span></h3>
+          <svg id="chartPayment" viewBox="0 0 460 230"></svg>
+        </div>
+        <div class="panel">
+          <h3>Churn by Internet Service<span class="hint">100% stacked — rate within each group</span></h3>
+          <svg id="chartInternet" viewBox="0 0 460 230"></svg>
+        </div>
+      </div>
+
+      <div class="insights">
+        <h3>Key Insights</h3>
+        <ul id="insightsList">
+          <li>Customers with month-to-month contracts show the highest churn.</li>
+          <li>Electronic check users churn more frequently than customers using other payment methods.</li>
+          <li>Fiber optic customers contribute a large share of churn.</li>
+          <li>Customers with longer tenure generally show lower churn rates.</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+
+  <aside class="filters">
+    <div class="filter-head">
+      <span>Filter by</span>
+      <button class="reset-btn" id="resetBtn">Reset all</button>
+    </div>
+    <div class="active-filters-note" id="activeNote">No filters applied — showing all <b>7,043</b> customers.</div>
+
+    <div class="filter-card">
+      <h4>Churn</h4>
+      <div class="opt-list" id="filterChurn"></div>
+    </div>
+    <div class="filter-card">
+      <h4>Gender</h4>
+      <div class="opt-list" id="filterGender"></div>
+    </div>
+    <div class="filter-card">
+      <h4>Contract Type</h4>
+      <div class="opt-list" id="filterContract"></div>
+    </div>
+    <div class="filter-card">
+      <h4>Internet Service</h4>
+      <div class="opt-list" id="filterInternet"></div>
+    </div>
+  </aside>
+</div>
+
+<footer>
+  Customer Churn Analysis — rebuilt as a standalone web dashboard from the Power BI report · IBM/Kaggle Telco Customer Churn dataset
+</footer>
+
+<div class="viz-tooltip" id="tooltip"></div>
+
+<script>
+function buildDataset(){
+  const rows = [];
+  const TOTAL = 7043;
+
+  function pick(weights){
+    const r = Math.random();
+    let acc = 0;
+    for(const [val,w] of weights){ acc += w; if(r <= acc) return val; }
+    return weights[weights.length-1][0];
+  }
+
+  for(let i=0;i<TOTAL;i++){
+    const gender = i < Math.round(TOTAL*0.5023) ? 'Male' : 'Female';
+    const partner = pick([['Yes',0.4827],['No',0.5173]]);
+    const dependents = pick([['No',0.6956],['Yes',0.3044]]);
+
+    const contract = pick([['Month-to-month',0.55],['One year',0.21],['Two year',0.24]]);
+    const internet = pick([['Fiber optic',0.4393],['DSL',0.3496],['No',0.2111]]);
+    const payment = pick([['Electronic check',0.336],['Mailed check',0.229],['Bank transfer (automatic)',0.219],['Credit card (automatic)',0.216]]);
+
+    let tenure;
+    const tr = Math.random();
+    if(tr < 0.32) tenure = Math.round(Math.random()*12);
+    else if(tr < 0.55) tenure = 12 + Math.round(Math.random()*24);
+    else if(tr < 0.75) tenure = 36 + Math.round(Math.random()*24);
+    else tenure = 60 + Math.round(Math.random()*12);
+
+    let p = 0.10;
+    if(contract === 'Month-to-month') p += 0.30; else if(contract === 'One year') p += 0.02;
+    if(internet === 'Fiber optic') p += 0.12;
+    if(payment === 'Electronic check') p += 0.14;
+    if(tenure < 6) p += 0.18; else if(tenure > 48) p -= 0.12;
+    p = Math.max(0.02, Math.min(0.92, p));
+
+    const churn = Math.random() < p ? 'Yes' : 'No';
+    const monthlyCharges = Math.round((internet==='Fiber optic' ? 75 + Math.random()*40 : internet==='DSL' ? 45 + Math.random()*30 : 20 + Math.random()*10))*1.0;
+
+    rows.push({gender, partner, dependents, contract, internet, payment, tenure, churn, monthlyCharges});
+  }
+  return rows;
+}
+
+const DATA = buildDataset();
+
+const state = {
+  churn: new Set(),
+  gender: new Set(),
+  contract: new Set(),
+  internet: new Set()
+};
+
+function filteredRows(){
+  return DATA.filter(r =>
+    (state.churn.size===0 || state.churn.has(r.churn)) &&
+    (state.gender.size===0 || state.gender.has(r.gender)) &&
+    (state.contract.size===0 || state.contract.has(r.contract)) &&
+    (state.internet.size===0 || state.internet.has(r.internet))
+  );
+}
+
+const FILTER_DEFS = [
+  {key:'churn', el:'filterChurn', options:['Yes','No'], labelMap:{Yes:'Churned', No:'Retained'}},
+  {key:'gender', el:'filterGender', options:['Female','Male']},
+  {key:'contract', el:'filterContract', options:['Month-to-month','One year','Two year']},
+  {key:'internet', el:'filterInternet', options:['Fiber optic','DSL','No']},
+];
+
+function countFor(key, value){
+  return DATA.filter(r => {
+    for(const f of FILTER_DEFS){
+      if(f.key===key) continue;
+      const set = state[f.key];
+      if(set.size>0 && !set.has(r[f.key])) return false;
+    }
+    return r[key]===value;
+  }).length;
+}
+
+function renderFilters(){
+  FILTER_DEFS.forEach(f=>{
+    const container = document.getElementById(f.el);
+    container.innerHTML = '';
+    f.options.forEach(opt=>{
+      const div = document.createElement('div');
+      const active = state[f.key].has(opt);
+      div.className = 'opt' + (active ? ' active' : '');
+      const label = (f.labelMap && f.labelMap[opt]) || opt;
+      div.innerHTML = `
+        <span style="display:flex;align-items:center;gap:9px;">
+          <span class="opt-check"><svg viewBox="0 0 10 10" fill="none"><path d="M1.5 5L4 7.5L8.5 2" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          ${label}
+        </span>
+        <span class="cnt">${countFor(f.key,opt).toLocaleString()}</span>`;
+      div.addEventListener('click', ()=>{
+        if(state[f.key].has(opt)) state[f.key].delete(opt);
+        else state[f.key].add(opt);
+        renderAll();
+      });
+      container.appendChild(div);
+    });
+  });
+
+  const activeCount = filteredRows().length;
+  const anyFilter = FILTER_DEFS.some(f=>state[f.key].size>0);
+  const note = document.getElementById('activeNote');
+  if(!anyFilter){
+    note.innerHTML = `No filters applied — showing all <b>${DATA.length.toLocaleString()}</b> customers.`;
+  } else {
+    note.innerHTML = `Showing <b>${activeCount.toLocaleString()}</b> of ${DATA.length.toLocaleString()} customers.`;
+  }
+}
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  FILTER_DEFS.forEach(f=>state[f.key].clear());
+  renderAll();
+});
+
+const tip = document.getElementById('tooltip');
+function showTip(html, x, y){
+  tip.innerHTML = html;
+  tip.style.left = (x+14)+'px';
+  tip.style.top = (y+14)+'px';
+  tip.style.opacity = 1;
+}
+function hideTip(){ tip.style.opacity = 0; }
+
+function animateNumber(el, from, to, suffix='', decimals=0){
+  const dur = 500, start = performance.now();
+  function step(now){
+    const t = Math.min(1,(now-start)/dur);
+    const eased = 1 - Math.pow(1-t,3);
+    const val = from + (to-from)*eased;
+    el.textContent = (decimals>0 ? val.toFixed(decimals) : Math.round(val).toLocaleString()) + suffix;
+    if(t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+let lastKpis = {total:0, churned:0, rate:0, tenure:0, charges:0};
+
+function renderKPIs(rows){
+  const total = rows.length;
+  const churned = rows.filter(r=>r.churn==='Yes').length;
+  const rate = total ? (churned/total*100) : 0;
+  const avgTenure = total ? rows.reduce((a,r)=>a+r.tenure,0)/total : 0;
+  const avgCharges = total ? rows.reduce((a,r)=>a+r.monthlyCharges,0)/total : 0;
+
+  animateNumber(document.getElementById('kpiTotal'), lastKpis.total, total);
+  animateNumber(document.getElementById('kpiChurned'), lastKpis.churned, churned);
+  document.getElementById('kpiRate').textContent = rate.toFixed(1)+'%';
+  document.getElementById('kpiTenure').textContent = avgTenure.toFixed(1)+' mo';
+  document.getElementById('kpiCharges').textContent = '$'+avgCharges.toFixed(2);
+
+  lastKpis = {total, churned, rate, tenure:avgTenure, charges:avgCharges};
+
+  document.getElementById('gaugeNum').textContent = rate.toFixed(1)+'%';
+  document.getElementById('gaugeNum').style.color = rate>30 ? 'var(--churn)' : rate>20 ? 'var(--amber)' : 'var(--retain)';
+  document.getElementById('gaugeSub').textContent = `${churned.toLocaleString()} of ${total.toLocaleString()} customers`;
+  drawGauge(rate);
+}
+
+function drawGauge(pct){
+  const svg = document.getElementById('gaugeSvg');
+  const cx=110, cy=120, r=88;
+
+  const arcPath = (fromFrac, toFrac, color, widthExtra=0)=>{
+    const a0 = Math.PI*(1-fromFrac), a1 = Math.PI*(1-toFrac);
+    const x0 = cx + r*Math.cos(a0), y0 = cy - r*Math.sin(a0);
+    const x1 = cx + r*Math.cos(a1), y1 = cy - r*Math.sin(a1);
+    const largeArc = 0;
+    return `<path d="M ${x0} ${y0} A ${r} ${r} 0 ${largeArc} 1 ${x1} ${y1}" stroke="${color}" stroke-width="${20+widthExtra}" fill="none" stroke-linecap="round"/>`;
+  };
+
+  const frac = Math.max(0.001, Math.min(0.999, pct/100));
+  let html = '';
+  html += arcPath(0, 1, 'rgba(20,30,50,0.07)', 4);
+  html += arcPath(0, frac, 'url(#gaugeGrad)');
+  const ang = Math.PI*(1-frac);
+  const nx = cx + (r)*Math.cos(ang), ny = cy - (r)*Math.sin(ang);
+  html += `<circle cx="${nx}" cy="${ny}" r="7" fill="#fff"/><circle cx="${nx}" cy="${ny}" r="7" fill="none" stroke="var(--churn)" stroke-width="2"/>`;
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#00C292"/>
+        <stop offset="55%" stop-color="#FFB300"/>
+        <stop offset="100%" stop-color="#FF3B5C"/>
+      </linearGradient>
+    </defs>
+    ${html}
+  `;
+}
+
+const COLORS = {
+  retain:'#00C292', churn:'#FF3B5C', amber:'#FFB300',
+  catA:'#2D6CFF', catB:'#7B61FF', catC:'#FFB300', catD:'#00C292'
+};
+
+function donutChart(svgId, legendId, segments, opts={}){
+  const svg = document.getElementById(svgId);
+  const total = segments.reduce((a,s)=>a+s.value,0) || 1;
+  const cx=130, cy=100, r=72, rInner=44;
+  let angle = -Math.PI/2;
+  let paths = '';
+  segments.forEach(s=>{
+    const frac = s.value/total;
+    const a0 = angle, a1 = angle + frac*Math.PI*2;
+    const large = (a1-a0) > Math.PI ? 1 : 0;
+    const x0o = cx + r*Math.cos(a0), y0o = cy + r*Math.sin(a0);
+    const x1o = cx + r*Math.cos(a1), y1o = cy + r*Math.sin(a1);
+    const x0i = cx + rInner*Math.cos(a1), y0i = cy + rInner*Math.sin(a1);
+    const x1i = cx + rInner*Math.cos(a0), y1i = cy + rInner*Math.sin(a0);
+    const d = `M ${x0o} ${y0o} A ${r} ${r} 0 ${large} 1 ${x1o} ${y1o} L ${x0i} ${y0i} A ${rInner} ${rInner} 0 ${large} 0 ${x1i} ${y1i} Z`;
+    paths += `<path class="seg" d="${d}" fill="${s.color}" data-label="${s.label}" data-value="${s.value}" data-pct="${(frac*100).toFixed(1)}" style="cursor:pointer; transition:opacity .15s;"/>`;
+    angle = a1;
+  });
+
+  const labelMid = `<text x="${cx}" y="${cy-4}" text-anchor="middle" fill="#15213B" font-family="Space Grotesk" font-size="20" font-weight="700">${total.toLocaleString()}</text>
+                     <text x="${cx}" y="${cy+14}" text-anchor="middle" fill="#8C99B5" font-family="Inter" font-size="10">customers</text>`;
+
+  svg.innerHTML = `<g>${paths}</g>${labelMid}`;
+
+  svg.querySelectorAll('.seg').forEach(seg=>{
+    seg.addEventListener('mousemove', (e)=>{
+      svg.querySelectorAll('.seg').forEach(s=>s.style.opacity='0.55');
+      seg.style.opacity='1';
+      showTip(`<b>${seg.dataset.label}</b><br>${Number(seg.dataset.value).toLocaleString()} customers (${seg.dataset.pct}%)`, e.clientX, e.clientY);
+    });
+    seg.addEventListener('mouseleave', ()=>{
+      svg.querySelectorAll('.seg').forEach(s=>s.style.opacity='1');
+      hideTip();
+    });
+  });
+
+  if(legendId){
+    const legend = document.getElementById(legendId);
+    if(legend){
+      legend.innerHTML = segments.map(s=>`<span><i class="sw" style="background:${s.color}"></i>${s.label} · ${((s.value/total)*100).toFixed(0)}%</span>`).join('');
+    }
+  }
+}
+
+function simpleBarChart(svgId, data, opts={}){
+  const svg = document.getElementById(svgId);
+  const W = opts.w || 260, H = opts.h || 220;
+  const padL = 6, padR = 14, padT = 10, padB = 34;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const max = Math.max(1, ...data.map(d=>d.value));
+  const bw = innerW / data.length * 0.6;
+  const gap = innerW / data.length;
+
+  let bars = '', labels = '';
+  data.forEach((d,i)=>{
+    const h = (d.value/max) * innerH;
+    const x = padL + gap*i + (gap-bw)/2;
+    const y = padT + innerH - h;
+    bars += `<rect class="bar" x="${x}" y="${y}" width="${bw}" height="${h}" rx="5" fill="${d.color||COLORS.catA}" data-label="${d.label}" data-value="${d.value}" style="cursor:pointer; transition:opacity .15s;"/>`;
+    labels += `<text x="${x+bw/2}" y="${H-14}" text-anchor="middle" fill="#8C99B5" font-size="10.5" font-family="Inter">${d.label}</text>`;
+    labels += `<text x="${x+bw/2}" y="${y-7}" text-anchor="middle" fill="#15213B" font-size="11" font-family="Space Grotesk" font-weight="600">${d.value.toLocaleString()}</text>`;
+  });
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `<line x1="${padL}" y1="${padT+innerH}" x2="${W-padR}" y2="${padT+innerH}" stroke="rgba(20,30,50,0.12)"/>${bars}${labels}`;
+
+  svg.querySelectorAll('.bar').forEach(b=>{
+    b.addEventListener('mousemove', (e)=>{
+      svg.querySelectorAll('.bar').forEach(x=>x.style.opacity='0.55');
+      b.style.opacity='1';
+      showTip(`<b>${b.dataset.label}</b><br>${Number(b.dataset.value).toLocaleString()} customers`, e.clientX, e.clientY);
+    });
+    b.addEventListener('mouseleave', ()=>{
+      svg.querySelectorAll('.bar').forEach(x=>x.style.opacity='1');
+      hideTip();
+    });
+  });
+}
+
+function stackedBarChart(svgId, data, opts={}){
+  const svg = document.getElementById(svgId);
+  const W = opts.w || 460, H = opts.h || 230;
+  const padL = 10, padR = 14, padT = 14, padB = 36;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const max = Math.max(1, ...data.map(d=>d.yes+d.no));
+  const bw = innerW / data.length * 0.5;
+  const gap = innerW / data.length;
+
+  let bars='', labels='';
+  data.forEach((d,i)=>{
+    const totalH = ((d.yes+d.no)/max)*innerH;
+    const x = padL + gap*i + (gap-bw)/2;
+    const yTop = padT + innerH - totalH;
+    const yesH = (d.yes/max)*innerH;
+    const noH = (d.no/max)*innerH;
+    const pct = ((d.yes/(d.yes+d.no))*100).toFixed(0);
+
+    bars += `<rect class="seg" data-label="${d.label}" data-kind="Retained" data-value="${d.no}" x="${x}" y="${yTop+yesH}" width="${bw}" height="${noH}" rx="4" fill="${COLORS.retain}" style="cursor:pointer;transition:opacity .15s;"/>`;
+    bars += `<rect class="seg" data-label="${d.label}" data-kind="Churned" data-value="${d.yes}" x="${x}" y="${yTop}" width="${bw}" height="${yesH}" rx="4" fill="${COLORS.churn}" style="cursor:pointer;transition:opacity .15s;"/>`;
+    labels += `<text x="${x+bw/2}" y="${H-16}" text-anchor="middle" fill="#8C99B5" font-size="10.5" font-family="Inter">${d.label}</text>`;
+    labels += `<text x="${x+bw/2}" y="${yTop-7}" text-anchor="middle" fill="#FF3B5C" font-size="11" font-family="Space Grotesk" font-weight="600">${pct}%</text>`;
+  });
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `<line x1="${padL}" y1="${padT+innerH}" x2="${W-padR}" y2="${padT+innerH}" stroke="rgba(20,30,50,0.12)"/>${bars}${labels}`;
+
+  svg.querySelectorAll('.seg').forEach(seg=>{
+    seg.addEventListener('mousemove', (e)=>{
+      svg.querySelectorAll('.seg').forEach(s=>s.style.opacity='0.55');
+      seg.style.opacity='1';
+      showTip(`<b>${seg.dataset.label}</b><br>${seg.dataset.kind}: ${Number(seg.dataset.value).toLocaleString()}`, e.clientX, e.clientY);
+    });
+    seg.addEventListener('mouseleave', ()=>{
+      svg.querySelectorAll('.seg').forEach(s=>s.style.opacity='1');
+      hideTip();
+    });
+  });
+}
+
+function pctStackedChart(svgId, data, opts={}){
+  const svg = document.getElementById(svgId);
+  const W = opts.w || 460, H = opts.h || 230;
+  const padL = 90, padR = 50, padT = 16, padB = 16;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const rowH = innerH / data.length * 0.62;
+  const gap = innerH / data.length;
+
+  let bars='', labels='';
+  data.forEach((d,i)=>{
+    const total = d.yes + d.no || 1;
+    const yesFrac = d.yes/total, noFrac = d.no/total;
+    const y = padT + gap*i + (gap-rowH)/2;
+    const noW = noFrac*innerW, yesW = yesFrac*innerW;
+
+    bars += `<rect class="seg" data-label="${d.label}" data-kind="Retained" data-pct="${(noFrac*100).toFixed(1)}" x="${padL}" y="${y}" width="${noW}" height="${rowH}" rx="4" fill="${COLORS.retain}" style="cursor:pointer;transition:opacity .15s;"/>`;
+    bars += `<rect class="seg" data-label="${d.label}" data-kind="Churned" data-pct="${(yesFrac*100).toFixed(1)}" x="${padL+noW}" y="${y}" width="${yesW}" height="${rowH}" rx="4" fill="${COLORS.churn}" style="cursor:pointer;transition:opacity .15s;"/>`;
+    labels += `<text x="${padL-10}" y="${y+rowH/2+4}" text-anchor="end" fill="#8C99B5" font-size="11" font-family="Inter">${d.label}</text>`;
+    labels += `<text x="${padL+noW+yesW+8}" y="${y+rowH/2+4}" text-anchor="start" fill="#FF3B5C" font-size="11" font-family="Space Grotesk" font-weight="600">${(yesFrac*100).toFixed(0)}%</text>`;
+  });
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `${bars}${labels}`;
+
+  svg.querySelectorAll('.seg').forEach(seg=>{
+    seg.addEventListener('mousemove', (e)=>{
+      svg.querySelectorAll('.seg').forEach(s=>s.style.opacity='0.55');
+      seg.style.opacity='1';
+      showTip(`<b>${seg.dataset.label}</b><br>${seg.dataset.kind}: ${seg.dataset.pct}%`, e.clientX, e.clientY);
+    });
+    seg.addEventListener('mouseleave', ()=>{
+      svg.querySelectorAll('.seg').forEach(s=>s.style.opacity='1');
+      hideTip();
+    });
+  });
+}
+
+function histogramChart(svgId, rows, opts={}){
+  const svg = document.getElementById(svgId);
+  const W = opts.w || 460, H = opts.h || 230;
+  const padL = 14, padR = 14, padT = 14, padB = 36;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+
+  const bins = [[0,12],[12,24],[24,36],[36,48],[48,60],[60,72]];
+  const counts = bins.map(([a,b])=> rows.filter(r=>r.tenure>=a && r.tenure<b).length);
+  const max = Math.max(1, ...counts);
+  const bw = innerW/bins.length*0.68;
+  const gap = innerW/bins.length;
+
+  let bars='', labels='';
+  counts.forEach((c,i)=>{
+    const h = (c/max)*innerH;
+    const x = padL + gap*i + (gap-bw)/2;
+    const y = padT + innerH - h;
+    bars += `<rect class="hbar" data-label="${bins[i][0]}-${bins[i][1]} mo" data-value="${c}" x="${x}" y="${y}" width="${bw}" height="${h}" rx="5" fill="${COLORS.catB}" style="cursor:pointer;transition:opacity .15s;"/>`;
+    labels += `<text x="${x+bw/2}" y="${H-16}" text-anchor="middle" fill="#8C99B5" font-size="10" font-family="Inter">${bins[i][0]}-${bins[i][1]}</text>`;
+    if(c>0) labels += `<text x="${x+bw/2}" y="${y-7}" text-anchor="middle" fill="#15213B" font-size="11" font-family="Space Grotesk" font-weight="600">${c}</text>`;
+  });
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `<line x1="${padL}" y1="${padT+innerH}" x2="${W-padR}" y2="${padT+innerH}" stroke="rgba(20,30,50,0.12)"/>${bars}${labels}`;
+
+  svg.querySelectorAll('.hbar').forEach(b=>{
+    b.addEventListener('mousemove', (e)=>{
+      svg.querySelectorAll('.hbar').forEach(x=>x.style.opacity='0.55');
+      b.style.opacity='1';
+      showTip(`<b>Tenure ${b.dataset.label}</b><br>${Number(b.dataset.value).toLocaleString()} customers`, e.clientX, e.clientY);
+    });
+    b.addEventListener('mouseleave', ()=>{
+      svg.querySelectorAll('.hbar').forEach(x=>x.style.opacity='1');
+      hideTip();
+    });
+  });
+}
+
+function groupBy(rows, key){
+  const m = {};
+  rows.forEach(r=>{ m[r[key]] = (m[r[key]]||0)+1; });
+  return m;
+}
+function groupByChurn(rows, key, order){
+  const m = {};
+  order.forEach(k=> m[k] = {yes:0, no:0});
+  rows.forEach(r=>{
+    if(!m[r[key]]) m[r[key]] = {yes:0, no:0};
+    if(r.churn==='Yes') m[r[key]].yes++; else m[r[key]].no++;
+  });
+  return order.map(k=>({label:k, yes:m[k].yes, no:m[k].no}));
+}
+
+function renderAll(){
+  const rows = filteredRows();
+  renderKPIs(rows);
+  renderFilters();
+
+  const g = groupBy(rows, 'gender');
+  donutChart('chartGender', 'legendGender', [
+    {label:'Male', value: g['Male']||0, color: COLORS.catA},
+    {label:'Female', value: g['Female']||0, color: COLORS.amber},
+  ]);
+
+  const p = groupBy(rows, 'partner');
+  simpleBarChart('chartPartner', [
+    {label:'No', value: p['No']||0, color: COLORS.catA},
+    {label:'Yes', value: p['Yes']||0, color: COLORS.amber},
+  ]);
+
+  const d = groupBy(rows, 'dependents');
+  donutChart('chartDependents', 'legendDependents', [
+    {label:'No', value: d['No']||0, color: COLORS.catA},
+    {label:'Yes', value: d['Yes']||0, color: COLORS.retain},
+  ]);
+
+  histogramChart('chartTenure', rows);
+
+  stackedBarChart('chartContract', groupByChurn(rows, 'contract', ['Month-to-month','One year','Two year']));
+  stackedBarChart('chartPayment', groupByChurn(rows, 'payment', ['Electronic check','Mailed check','Bank transfer (automatic)','Credit card (automatic)']));
+  pctStackedChart('chartInternet', groupByChurn(rows, 'internet', ['Fiber optic','DSL','No']));
+}
+
+renderAll();
+</script>
+</body>
+</html>
