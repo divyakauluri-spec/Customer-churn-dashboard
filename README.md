@@ -1,22 +1,22 @@
 
-#  Customer Churn Dashboard
+ Customer Churn Dashboard
 
 ````markdown
-#  Customer Churn Analysis Dashboard
+ Customer Churn Analysis Dashboard
 
-##  Overview
+ Overview
 
 An interactive Power BI dashboard designed to analyze customer churn patterns and provide actionable business insights. The dashboard enables organizations to understand customer behavior, identify churn trends, and support data-driven decision-making.
 
 ---
 
-##  Problem Statement
+ Problem Statement
 
 Customer retention is one of the biggest challenges for businesses. This project analyzes customer data to identify factors influencing churn and helps stakeholders make informed retention strategies.
 
 ---
 
-##  Features
+  Features
 
 - Customer Segmentation
 - Churn Analysis
@@ -27,7 +27,7 @@ Customer retention is one of the biggest challenges for businesses. This project
 
 ---
 
-## Technologies Used
+Technologies Used
 
 - Power BI
 - Power Query
@@ -36,13 +36,13 @@ Customer retention is one of the biggest challenges for businesses. This project
 
 ---
 
-##  Live Dashboard
+ Live Dashboard
 
  https://divyakauluri-spec.github.io/Customer-churn-dashboard/churn_customer_dashboard.html
 
 ---
 
-##  Dashboard Highlights
+ Dashboard Highlights
 
 - Customer Overview
 - Churn Distribution
@@ -53,7 +53,7 @@ Customer retention is one of the biggest challenges for businesses. This project
 
 ---
 
-## Business Insights
+ Business Insights
 
 The dashboard helps decision-makers identify:
 
@@ -64,7 +64,7 @@ The dashboard helps decision-makers identify:
 
 ---
 
-##  Learning Outcomes
+ Learning Outcomes
 
 - Dashboard Design
 - Data Visualization
@@ -74,7 +74,7 @@ The dashboard helps decision-makers identify:
 
 ---
 
-## Future Improvements
+ Future Improvements
 
 - Predictive Churn Model
 - Real-time Database Integration
@@ -83,7 +83,7 @@ The dashboard helps decision-makers identify:
 
 ---
 
-## Author
+##Author
 
 **Divya Kauluri**
 
